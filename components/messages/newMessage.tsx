@@ -2,11 +2,15 @@ import { cn } from "@/lib/utils/clsx";
 import { Flex } from "@/ui";
 import {
   Accordion,
+  AccordionContent,
   AccordionHeader,
   AccordionItem,
   AccordionTrigger,
 } from "@radix-ui/react-accordion";
-import { FC, forwardRef } from "react";
+import { FC, forwardRef, useRef } from "react";
+import { NewAIMessageContent } from "./newAIMessageContent";
+import FormattedContent from "./FormattedAnswer";
+import ReactMarkdown from 'react-markdown';
 
 export type TMessage = {
   question: string
@@ -23,7 +27,8 @@ const CustomTrigger = forwardRef<
     <AccordionTrigger
       {...props}
       ref={ref}
-      className="group flex w-full items-center justify-between"
+      // items-center
+      className="group flex w-full justify-between"
     >
       <Flex className="w-full flex-1 items-start">{children}</Flex>
     </AccordionTrigger>
@@ -32,36 +37,18 @@ const CustomTrigger = forwardRef<
 
 CustomTrigger.displayName = "CustomTrigger";
 
-export const NewMessage: FC<TMessage> = ({ 
+export const NewMessage: FC<TMessage> = ({
   question,
   answer,
   model = "",
   intent = "",
- }) => {
-  function convertTextToHTML(text: string) {
-    // Replace bold markers with HTML bold tags
-    text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    
-    // Convert numbered lists
-    text = text.replace(/(\d+)\.\s*(.+)(?=\n|$)/g, '<li><strong>$2</strong></li>');
-    text = `<ol>${text}</ol>`;
-    
-    // Convert unordered lists (if applicable)
-    text = text.replace(/•\s*(.+)(?=\n|$)/g, '<li>$1</li>');
-    text = `<ul>${text}</ul>`;
-    
-    // Convert sections to paragraphs
-    text = text.replace(/(\w+):\s*(.+)(?=\n|$)/g, '<h2>$1</h2><p>$2</p>');
-    
-    return text;
-  }
-  
-  
+}) => {
+  const markdownRef = useRef<HTMLDivElement>(null);
+
   return (
     <Accordion
       type="single"
       className="w-full"
-      collapsible
       defaultValue={answer}
     >
       <AccordionItem
@@ -74,15 +61,26 @@ export const NewMessage: FC<TMessage> = ({
         <CustomTrigger>
           <Flex direction="col" gap="md" items="start">
             <h1 className="text-gray-400">{question}</h1>
-
-            <p className="text-gray-400 text-sm italic">{intent} / {model}</p>
-
-            <div className="text-start" dangerouslySetInnerHTML={{ __html: convertTextToHTML(answer) }}/>
+            <div
+              style={{
+                textAlign: "start",
+                lineHeight: "2.0",
+              }}
+            >
+              <div ref={markdownRef}>
+                <ReactMarkdown>{answer}</ReactMarkdown>
+              </div>
+            </div>
           </Flex>
         </CustomTrigger>
-        {/* <AccordionContent className="w-full items-start p-2">
-          <AIMessage message={message} isLast={isLast} />
-        </AccordionContent> */}
+        <AccordionContent className="w-full items-start p-2">
+          <NewAIMessageContent
+            message={answer}
+            modelName={model}
+            intent={intent}
+            textContentRef={markdownRef}
+          />
+        </AccordionContent>
       </AccordionItem>
     </Accordion>
   );
