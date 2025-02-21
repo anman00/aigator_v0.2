@@ -18,9 +18,10 @@ export const useOpenRouter = () => {
   const editor = store((state) => state.editor);
   const setIsGenerating = store((state) => state.setIsGenerating);
   const { toast } = useToast();
-  const { setChats, updateCurrentMessage } = useOpenRouterStore();
+  const { setChats, updateCurrentMessage, setCurrentSelectedModel } = useOpenRouterStore();
 
   const detectIntent = async (input: any, context?: any) => {
+    setIsGenerating(true);
     try {
       const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
@@ -102,6 +103,7 @@ export const useOpenRouter = () => {
         intent: finalIntent,
         otherIntents: otherIntents
       };
+      setCurrentSelectedModel(result.model);
   
       return result;
     } catch (error) {
@@ -112,12 +114,54 @@ export const useOpenRouter = () => {
         variant: "destructive",
       });
       throw error;
+    } finally {
+      // setIsGenerating(false);
     }
   };
 
-  const invokeOpenRouter = async (input: any, intent?: any, context?: any,) => {
+  // const invokeOpenRouter = async (input: any, intent?: any, context?: any,) => {
+  //   try {
+  //     fetch("https://openrouter.ai/api/v1/chat/completions", {
+  //       method: "POST",
+  //       headers: {
+  //         "Authorization": `Bearer ${process.env.NEXT_PUBLIC_OPENROUTER_API_KEY}`,
+  //         "Content-Type": "application/json"
+  //       },
+  //       body: JSON.stringify({
+  //         "model": intent.model || "openai/gpt-3.5-turbo",
+  //         "messages": [
+  //           {
+  //             "role": "user",
+  //             // "content": `${context && "This is the context " + context} This is the input ${input}`,
+  //             // "content": ` ${input} - please format your response in a rich text format`,
+  //             "content": ` ${input}`,
+  //           }
+  //         ]
+  //       })
+  //     }).then((response) => response.json())
+  //       .then((data) => {
+  //         // setIsGenerating(true);
+  //         editor?.commands.clearContent();
+  //         setChats(input, data.choices.map((choice: any) => choice.message), intent.model, intent.intent);
+  //         updateCurrentMessage(data.choices[0].message.content);
+  //         // setIsGenerating(false);
+  //       });
+  //   } catch (error) {
+  //     console.log(error);
+  //     toast({
+  //       title: "Error",
+  //       description: "Error invoking OpenRouter",
+  //       variant: "destructive",
+  //     });
+  //   }
+  // }
+
+
+  const invokeOpenRouter = async (input: any, intent?: any, context?: any) => {
     try {
-      fetch("https://openrouter.ai/api/v1/chat/completions", {
+      setIsGenerating(true); // Set generating state at the start
+      
+      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${process.env.NEXT_PUBLIC_OPENROUTER_API_KEY}`,
@@ -128,20 +172,29 @@ export const useOpenRouter = () => {
           "messages": [
             {
               "role": "user",
-              // "content": `${context && "This is the context " + context} This is the input ${input}`,
-              // "content": ` ${input} - please format your response in a rich text format`,
-              "content": ` ${input}`,
+              "content": `${input}`,
             }
           ]
         })
-      }).then((response) => response.json())
-        .then((data) => {
-          // setIsGenerating(true);
-          editor?.commands.clearContent();
-          setChats(input, data.choices.map((choice: any) => choice.message), intent.model, intent.intent);
-          updateCurrentMessage(data.choices[0].message.content);
-          // setIsGenerating(false);
-        });
+      });
+
+      const data = await response.json();
+      
+      // Set the model before clearing content
+      if (intent?.model) {
+        setCurrentSelectedModel(intent.model);
+      }
+
+      // Wait for state updates before proceeding
+      await new Promise(resolve => setTimeout(resolve, 0));
+      
+      editor?.commands.clearContent();
+      setChats(input, data.choices.map((choice: any) => choice.message), intent.model, intent.intent);
+      updateCurrentMessage(data.choices[0].message.content);
+      
+      // Don't clear the model until the response is complete
+      // Only clear it when starting a new message
+      
     } catch (error) {
       console.log(error);
       toast({
@@ -149,8 +202,11 @@ export const useOpenRouter = () => {
         description: "Error invoking OpenRouter",
         variant: "destructive",
       });
+    } finally {
+      setIsGenerating(false); // Ensure generating state is updated
+      setCurrentSelectedModel(""); // Reset the model when done
     }
-  }
+  };
 
   return {
     invokeOpenRouter, detectIntent
